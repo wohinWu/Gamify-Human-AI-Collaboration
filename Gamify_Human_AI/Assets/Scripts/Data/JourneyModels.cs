@@ -195,7 +195,7 @@ namespace GamifyHumanAI.Data
         public List<string> Errors = new List<string>();
 
         public override string ToString() =>
-            IsValid ? "✓ 校验通过" : $"✗ 校验失败（{Errors.Count} 个错误）:\n" + string.Join("\n", Errors);
+            IsValid ? "Validation passed" : $"Validation failed ({Errors.Count} errors):\n" + string.Join("\n", Errors);
     }
 
     // ──────────────────────────────────────────────────────────
@@ -214,20 +214,20 @@ namespace GamifyHumanAI.Data
             var result = new ValidationResult();
             if (state == null)
             {
-                result.Errors.Add("JourneyState 为 null");
+                result.Errors.Add("JourneyState is null");
                 return result;
             }
 
             // ── 根字段 ──────────────────────────────────────
             if (state.schemaVersion != 1)
-                result.Errors.Add($"schemaVersion 应为 1，当前为 {state.schemaVersion}");
+                result.Errors.Add($"schemaVersion must be 1, got {state.schemaVersion}");
 
             RequireNonEmpty(result, state.journeyId, "journeyId");
             RequireNonEmpty(result, state.name,      "name");
             RequireNonEmpty(result, state.goal,      "goal");
 
             if (state.createdAt <= 0)
-                result.Errors.Add("createdAt 必须 > 0");
+                result.Errors.Add("createdAt must be > 0");
 
             // ── Roles ────────────────────────────────────────
             for (int i = 0; i < state.roles.Count; i++)
@@ -241,7 +241,7 @@ namespace GamifyHumanAI.Data
 
                 if (role.windowBinding == null)
                 {
-                    result.Errors.Add($"{pfx}.windowBinding 为 null");
+                    result.Errors.Add($"{pfx}.windowBinding is null");
                 }
                 else
                 {
@@ -250,7 +250,7 @@ namespace GamifyHumanAI.Data
                 }
 
                 if (role.lastUpdateAt <= 0)
-                    result.Errors.Add($"{pfx}.lastUpdateAt 必须 > 0");
+                    result.Errors.Add($"{pfx}.lastUpdateAt must be > 0");
             }
 
             // ── RoadmapNodes（含 nodeId 唯一性）────────────────
@@ -266,11 +266,11 @@ namespace GamifyHumanAI.Data
                 if (!string.IsNullOrEmpty(node.nodeId))
                 {
                     if (!seenNodeIds.Add(node.nodeId))
-                        result.Errors.Add($"nodeId 重复: \"{node.nodeId}\"");
+                        result.Errors.Add($"Duplicate nodeId: \"{node.nodeId}\"");
                 }
 
                 if (node.order < 0)
-                    result.Errors.Add($"{pfx}.order 不可为负（当前 {node.order}）");
+                    result.Errors.Add($"{pfx}.order must be >= 0 (got {node.order})");
 
                 if (node.evidence != null)
                 {
@@ -278,7 +278,7 @@ namespace GamifyHumanAI.Data
                     RequireNonEmpty(result, node.evidence.rule,         $"{pfx}.evidence.rule");
 
                     if (node.evidence.confidence < 0f || node.evidence.confidence > 1f)
-                        result.Errors.Add($"{pfx}.evidence.confidence 应在 [0,1]，当前 {node.evidence.confidence}");
+                        result.Errors.Add($"{pfx}.evidence.confidence must be [0,1] (got {node.evidence.confidence})");
                 }
             }
 
@@ -292,11 +292,11 @@ namespace GamifyHumanAI.Data
                 RequireNonEmpty(result, evt.summary, $"{pfx}.summary");
 
                 if (evt.timestamp <= 0)
-                    result.Errors.Add($"{pfx}.timestamp 必须 > 0");
+                    result.Errors.Add($"{pfx}.timestamp must be > 0");
 
                 // 校验 relatedNodeId 若填写则必须存在于 roadmap
                 if (!string.IsNullOrEmpty(evt.relatedNodeId) && !seenNodeIds.Contains(evt.relatedNodeId))
-                    result.Errors.Add($"{pfx}.relatedNodeId \"{evt.relatedNodeId}\" 在 roadmap 中不存在");
+                    result.Errors.Add($"{pfx}.relatedNodeId \"{evt.relatedNodeId}\" not found in roadmap");
             }
 
             result.IsValid = result.Errors.Count == 0;
@@ -307,7 +307,7 @@ namespace GamifyHumanAI.Data
         private static void RequireNonEmpty(ValidationResult r, string value, string fieldPath)
         {
             if (string.IsNullOrWhiteSpace(value))
-                r.Errors.Add($"{fieldPath} 不可为空");
+                r.Errors.Add($"{fieldPath} cannot be empty");
         }
     }
 }

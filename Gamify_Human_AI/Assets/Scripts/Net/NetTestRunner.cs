@@ -21,6 +21,7 @@ namespace GamifyHumanAI.Net
 
         private IEnumerator Start()
         {
+            // Initialize 已由 JourneyTestRunner.Awake() 完成（幂等，重复调用无副作用）
             JourneyManager.Initialize(string.IsNullOrWhiteSpace(_customSaveDir) ? null : _customSaveDir);
             _client.BaseUrl = _baseUrl;
 
@@ -40,7 +41,7 @@ namespace GamifyHumanAI.Net
 
             if (!healthOk)
             {
-                LogInfo("请先运行 AgentService/start_agent.bat");
+                LogInfo("Please run backend/start_agent.bat first");
                 yield break;
             }
 
@@ -65,7 +66,7 @@ namespace GamifyHumanAI.Net
             List<AgentEventEnvelope> events;
             if (!TryParseEvents(responseBody, out events))
             {
-                LogInfo($"[Parse] 反序列化失败，原始 response={Short(responseBody)}");
+                LogInfo($"[Parse] Deserialize failed, raw response={Short(responseBody)}");
                 yield break;
             }
 
@@ -83,7 +84,7 @@ namespace GamifyHumanAI.Net
             var state = manager.GetActiveJourney();
             if (state == null)
             {
-                state = manager.CreateNewJourney("HTTP 联调测试", "验证 Unity 与 Python 的 AgentEvent 通信");
+                state = manager.CreateNewJourney("HTTP Integration Test", "Verify Unity-Python AgentEvent communication");
             }
 
             if (!state.roadmap.Exists(n => n.nodeId == "n1"))
@@ -91,8 +92,8 @@ namespace GamifyHumanAI.Net
                 manager.AddRoadmapNode(new RoadmapNode
                 {
                     nodeId = "n1",
-                    title = "网络回包验证节点",
-                    description = "收到 map_update_proposal 后应变为 completed",
+                    title = "Network Roundtrip Node",
+                    description = "Should become completed when map_update_proposal is received",
                     order = state.roadmap.Count,
                     status = NodeStatus.locked,
                 });

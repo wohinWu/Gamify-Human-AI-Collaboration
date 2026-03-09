@@ -37,12 +37,23 @@ namespace GamifyHumanAI.Data
         public static JourneyManager Instance => _instance ??= new JourneyManager();
 
         /// <summary>
-        /// 使用自定义存储目录（或测试用 mock）初始化单例。
-        /// 必须在首次访问 Instance 之前调用，否则无效。
+        /// 使用自定义存储目录初始化单例（幂等：多次调用不会覆盖已有实例）。
+        /// 保证 OnJourneyChanged 订阅者不会因重建实例而丢失。
+        /// 如需强制重建（仅用于测试），请调用 <see cref="Reset"/>。
         /// </summary>
         public static void Initialize(string saveDir = null)
         {
+            if (_instance != null) return;
             _instance = new JourneyManager(new Journey(saveDir));
+        }
+
+        /// <summary>
+        /// 强制销毁现有单例（仅测试用途）。
+        /// 下次访问 Instance 或调用 Initialize 时会创建新实例。
+        /// </summary>
+        public static void Reset()
+        {
+            _instance = null;
         }
 
         // ── 内部状态 ──────────────────────────────────────────
@@ -75,8 +86,8 @@ namespace GamifyHumanAI.Data
         /// </summary>
         public JourneyState CreateNewJourney(string name, string goal)
         {
-            if (string.IsNullOrWhiteSpace(name)) throw new ArgumentException("name 不可为空");
-            if (string.IsNullOrWhiteSpace(goal)) throw new ArgumentException("goal 不可为空");
+            if (string.IsNullOrWhiteSpace(name)) throw new ArgumentException("name cannot be empty");
+            if (string.IsNullOrWhiteSpace(goal)) throw new ArgumentException("goal cannot be empty");
 
             long now = Now();
             _active = new JourneyState
@@ -89,7 +100,7 @@ namespace GamifyHumanAI.Data
                 updatedAt = now,
             };
 
-            AppendEvent(EventType.user_action, $"Journey 已创建：{name}");
+            AppendEvent(EventType.user_action, $"Journey created: {name}");
             NotifyChanged();
             return _active;
         }
@@ -115,12 +126,12 @@ namespace GamifyHumanAI.Data
             AssertActive();
             if (role == null) throw new ArgumentNullException(nameof(role));
             if (_active.roles.Exists(r => r.roleId == role.roleId))
-                throw new InvalidOperationException($"roleId 已存在: {role.roleId}");
+                throw new InvalidOperationException($"roleId already exists: {role.roleId}");
 
             _active.roles.Add(role);
             Touch();
             AppendEvent(EventType.user_action,
-                $"角色已添加：{role.name}",
+                $"Role added: {role.name}",
                 sourceRoleId: role.roleId);
             NotifyChanged();
         }
@@ -140,7 +151,7 @@ namespace GamifyHumanAI.Data
             role.lastUpdateAt = lastUpdateAt ?? Now();
             Touch();
             AppendEvent(EventType.role_state_changed,
-                $"角色 [{role.name}] 状态变更：{prev} → {newState}",
+                $"Role [{role.name}] state: {prev} → {newState}",
                 sourceRoleId: roleId);
             NotifyChanged();
         }
@@ -156,12 +167,12 @@ namespace GamifyHumanAI.Data
             AssertActive();
             if (node == null) throw new ArgumentNullException(nameof(node));
             if (_active.roadmap.Exists(n => n.nodeId == node.nodeId))
-                throw new InvalidOperationException($"nodeId 已存在: {node.nodeId}");
+                throw new InvalidOperationException($"nodeId already exists: {node.nodeId}");
 
             _active.roadmap.Add(node);
             Touch();
             AppendEvent(EventType.map_update_applied,
-                $"节点已添加：{node.title}",
+                $"Node added: {node.title}",
                 relatedNodeId: node.nodeId);
             NotifyChanged();
         }
@@ -180,7 +191,7 @@ namespace GamifyHumanAI.Data
             if (evidence != null) node.evidence = evidence;
             Touch();
             AppendEvent(EventType.map_update_applied,
-                $"节点 [{node.title}] 状态变更：{prev} → {newStatus}",
+                $"Node [{node.title}] status: {prev} → {newStatus}",
                 relatedNodeId: nodeId);
             NotifyChanged();
         }
@@ -197,7 +208,7 @@ namespace GamifyHumanAI.Data
             _active.status = newStatus;
             Touch();
             AppendEvent(EventType.user_action,
-                $"Journey 状态变更：{prev} → {newStatus}");
+                $"Journey status: {prev} → {newStatus}");
             NotifyChanged();
         }
 
@@ -232,7 +243,7 @@ namespace GamifyHumanAI.Data
                     // 未知类型：只记录，不修改业务数据
                     Touch();
                     AppendEvent(EventType.user_action,
-                        $"收到未知 Agent 事件类型：{evt.type}（已忽略）");
+                        $"Unknown Agent event type: {evt.type} (ignored)");
                     NotifyChanged();
                     break;
             }
@@ -250,14 +261,14 @@ namespace GamifyHumanAI.Data
             if (string.IsNullOrWhiteSpace(evt.roleId))
             {
                 AppendEventOnly(EventType.role_state_changed,
-                    "role_state_changed 事件缺少 roleId，已忽略");
+                    "role_state_changed missing roleId (ignored)");
                 return;
             }
 
             if (!Enum.TryParse<RoleState>(evt.roleState, ignoreCase: true, out var newState))
             {
                 AppendEventOnly(EventType.role_state_changed,
-                    $"role_state_changed 事件 roleState 无法解析：\"{evt.roleState}\"，已忽略");
+                    $"role_state_changed roleState invalid: \"{evt.roleState}\" (ignored)");
                 return;
             }
 
@@ -282,14 +293,14 @@ namespace GamifyHumanAI.Data
             if (string.IsNullOrWhiteSpace(evt.nodeId))
             {
                 AppendEventOnly(EventType.map_update_applied,
-                    "map_update_proposal 事件缺少 nodeId，已忽略");
+                    "map_update_proposal missing nodeId (ignored)");
                 return;
             }
 
             if (!Enum.TryParse<NodeStatus>(evt.proposedStatus, ignoreCase: true, out var proposedStatus))
             {
                 AppendEventOnly(EventType.map_update_applied,
-                    $"map_update_proposal proposedStatus 无法解析：\"{evt.proposedStatus}\"，已忽略",
+                    $"map_update_proposal proposedStatus invalid: \"{evt.proposedStatus}\" (ignored)",
                     relatedNodeId: evt.nodeId);
                 return;
             }
@@ -314,12 +325,12 @@ namespace GamifyHumanAI.Data
             {
                 // 置信度不足或无有效证据：挂起提案，仅记录 eventLog
                 string reason = !hasEvidence
-                    ? "证据为空"
-                    : $"置信度 {evt.confidence:F2} < 0.8";
+                    ? "evidence empty"
+                    : $"confidence {evt.confidence:F2} < 0.8";
 
                 Touch();
                 AppendEvent(EventType.map_update_applied,
-                    $"节点 [{evt.nodeId}] 提案 pending（{reason}）：proposedStatus={proposedStatus}",
+                    $"Node [{evt.nodeId}] proposal pending ({reason}): proposedStatus={proposedStatus}",
                     relatedNodeId: evt.nodeId);
                 NotifyChanged();
             }
@@ -332,7 +343,7 @@ namespace GamifyHumanAI.Data
         private void ApplyReminderProposal(AgentEventEnvelope evt)
         {
             string severity = string.IsNullOrWhiteSpace(evt.severity) ? "normal" : evt.severity;
-            string message  = string.IsNullOrWhiteSpace(evt.message)  ? "（无消息体）" : evt.message;
+            string message  = string.IsNullOrWhiteSpace(evt.message)  ? "(no message)" : evt.message;
 
             Touch();
             AppendEvent(EventType.reminder,
@@ -406,14 +417,14 @@ namespace GamifyHumanAI.Data
         {
             if (_active == null)
                 throw new InvalidOperationException(
-                    "当前没有 active Journey，请先调用 CreateNewJourney 或 Load。");
+                    "No active Journey. Call CreateNewJourney or Load first.");
         }
 
         /// <summary>按 roleId 查找角色，找不到则抛出异常。</summary>
         private Role FindRole(string roleId)
         {
             var r = _active.roles.Find(x => x.roleId == roleId);
-            if (r == null) throw new KeyNotFoundException($"roleId 不存在: {roleId}");
+            if (r == null) throw new KeyNotFoundException($"roleId not found: {roleId}");
             return r;
         }
 
@@ -421,7 +432,7 @@ namespace GamifyHumanAI.Data
         private RoadmapNode FindNode(string nodeId)
         {
             var n = _active.roadmap.Find(x => x.nodeId == nodeId);
-            if (n == null) throw new KeyNotFoundException($"nodeId 不存在: {nodeId}");
+            if (n == null) throw new KeyNotFoundException($"nodeId not found: {nodeId}");
             return n;
         }
     }

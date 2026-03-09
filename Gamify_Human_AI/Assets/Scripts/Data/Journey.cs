@@ -70,7 +70,7 @@ namespace GamifyHumanAI.Data
         {
             if (state == null) throw new ArgumentNullException(nameof(state));
             if (string.IsNullOrWhiteSpace(state.journeyId))
-                throw new ArgumentException("journeyId 不可为空");
+                throw new ArgumentException("journeyId cannot be empty");
 
             // 刷新更新时间
             state.updatedAt = DateTimeOffset.UtcNow.ToUnixTimeSeconds();
@@ -100,13 +100,13 @@ namespace GamifyHumanAI.Data
         public JourneyState Load(string journeyId)
         {
             if (string.IsNullOrWhiteSpace(journeyId))
-                throw new ArgumentException("journeyId 不可为空");
+                throw new ArgumentException("journeyId cannot be empty");
 
             string path = GetSavePath(journeyId);
 
             // 若主文件损坏，可以在此添加回退到 .bak 的逻辑
             if (!File.Exists(path))
-                throw new FileNotFoundException($"Journey 文件不存在: {path}", path);
+                throw new FileNotFoundException($"Journey file not found: {path}", path);
 
             string json = File.ReadAllText(path, Encoding.UTF8);
             return JsonConvert.DeserializeObject<JourneyState>(json, _serializerSettings);
