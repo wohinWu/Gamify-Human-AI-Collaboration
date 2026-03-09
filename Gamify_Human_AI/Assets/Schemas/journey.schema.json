@@ -1,0 +1,132 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://gamify-human-ai/schemas/journey.schema.json",
+  "title": "JourneyState",
+  "description": "Journey 数据契约（schemaVersion=1）。运行时校验由 JourneyValidator.ValidateBasics() 执行轻量子集。",
+  "type": "object",
+  "required": ["schemaVersion", "journeyId", "name", "goal", "status", "createdAt", "updatedAt"],
+  "additionalProperties": false,
+  "properties": {
+    "schemaVersion": {
+      "type": "integer",
+      "const": 1,
+      "description": "Schema 版本号，当前固定为 1"
+    },
+    "journeyId": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Journey 唯一标识（GUID 字符串）"
+    },
+    "name": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Journey 名称"
+    },
+    "goal": {
+      "type": "string",
+      "minLength": 1,
+      "description": "本次 Journey 的核心目标"
+    },
+    "status": {
+      "type": "string",
+      "enum": ["Draft", "Active", "Paused", "Finished"],
+      "description": "Journey 整体状态"
+    },
+    "createdAt": {
+      "type": "integer",
+      "minimum": 0,
+      "description": "创建时间（Unix 秒）"
+    },
+    "updatedAt": {
+      "type": "integer",
+      "minimum": 0,
+      "description": "最后更新时间（Unix 秒）"
+    },
+    "roles": {
+      "type": "array",
+      "items": { "$ref": "#/definitions/Role" },
+      "description": "参与本 Journey 的 AI 角色列表"
+    },
+    "roadmap": {
+      "type": "array",
+      "items": { "$ref": "#/definitions/RoadmapNode" },
+      "description": "路线图节点，nodeId 须唯一"
+    },
+    "eventLog": {
+      "type": "array",
+      "items": { "$ref": "#/definitions/EventRecord" },
+      "description": "事件日志，按 timestamp 升序"
+    }
+  },
+  "definitions": {
+    "WindowBinding": {
+      "type": "object",
+      "required": ["windowId", "titleHint"],
+      "additionalProperties": false,
+      "properties": {
+        "windowId":  { "type": "string", "minLength": 1, "description": "绑定的窗口/标签 ID" },
+        "titleHint": { "type": "string", "description": "用于识别窗口的标题关键词" },
+        "urlHint":   { "type": "string", "description": "（可选）URL 匹配提示" }
+      }
+    },
+    "Role": {
+      "type": "object",
+      "required": ["roleId", "name", "avatarKey", "windowBinding", "roleState", "lastUpdateAt"],
+      "additionalProperties": false,
+      "properties": {
+        "roleId":        { "type": "string", "minLength": 1 },
+        "name":          { "type": "string", "minLength": 1 },
+        "avatarKey":     { "type": "string", "description": "头像资源键名" },
+        "windowBinding": { "$ref": "#/definitions/WindowBinding" },
+        "roleState": {
+          "type": "string",
+          "enum": ["Idle", "Generating", "FinishedWaitingView", "Error", "NotFound"]
+        },
+        "lastUpdateAt": { "type": "integer", "minimum": 0 }
+      }
+    },
+    "Evidence": {
+      "type": "object",
+      "required": ["sourceRoleId", "quote", "rule", "confidence"],
+      "additionalProperties": false,
+      "properties": {
+        "sourceRoleId": { "type": "string", "minLength": 1 },
+        "quote":        { "type": "string" },
+        "rule":         { "type": "string", "description": "触发本证据的规则名" },
+        "confidence":   { "type": "number", "minimum": 0, "maximum": 1 }
+      }
+    },
+    "RoadmapNode": {
+      "type": "object",
+      "required": ["nodeId", "title", "order", "status"],
+      "additionalProperties": false,
+      "properties": {
+        "nodeId":      { "type": "string", "minLength": 1 },
+        "title":       { "type": "string", "minLength": 1 },
+        "description": { "type": "string" },
+        "order":       { "type": "integer", "minimum": 0 },
+        "status": {
+          "type": "string",
+          "enum": ["locked", "unlocked", "in_progress", "completed"]
+        },
+        "evidence": { "$ref": "#/definitions/Evidence" }
+      }
+    },
+    "EventRecord": {
+      "type": "object",
+      "required": ["eventId", "eventType", "timestamp", "summary"],
+      "additionalProperties": false,
+      "properties": {
+        "eventId":       { "type": "string", "minLength": 1 },
+        "eventType": {
+          "type": "string",
+          "enum": ["user_action", "role_state_changed", "map_update_applied", "reminder"]
+        },
+        "timestamp":     { "type": "integer", "minimum": 0 },
+        "summary":       { "type": "string", "minLength": 1 },
+        "relatedNodeId": { "type": "string" },
+        "sourceRoleId":  { "type": "string" }
+      }
+    }
+  }
+}
